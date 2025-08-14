@@ -4,7 +4,7 @@ import cors from "cors";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import transactionRoutes from "./routes/transactionRoutes.js";
-
+import assistantRoutes from "./routes/assistantRoutes.js"; // new import
 
 dotenv.config();
 connectDB();
@@ -15,11 +15,9 @@ app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/transactions", transactionRoutes);
+app.use("/api/assistant", assistantRoutes); // new route
 
 app.get("/", (req, res) => res.send("API is running"));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
-
-

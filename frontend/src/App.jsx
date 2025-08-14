@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Settings from "./pages/Settings";
 import Navbar from "./components/Navbar";
+import Assistant from "./pages/Assistant"; // <-- new import
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/assistant" element={<Assistant />} /> {/* <-- new route */}
       </Routes>
     </Router>
   );

@@ -23,6 +23,9 @@ export default function Navbar() {
         <Link to="/settings" className="text-sm text-gray-700 dark:text-gray-300">
           Settings
         </Link>
+        <Link to="/assistant" className="text-sm text-gray-700 dark:text-gray-300">
+          AI Assistant
+        </Link>
       </div>
       <div className="flex items-center gap-3">
         {user ? (
