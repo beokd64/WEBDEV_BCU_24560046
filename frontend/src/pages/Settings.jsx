@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-
+import api from "../api";
 // Static exchange rates relative to USD
 const staticRates = {
   USD: 1,

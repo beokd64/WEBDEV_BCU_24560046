@@ -1,6 +1,7 @@
 // src/pages/Assistant.jsx
 import { useState } from "react";
 import axios from "axios";
+import api from "../api";
 
 export default function Assistant() {
   const [messages, setMessages] = useState([
