@@ -1,49 +1,27 @@
-// routes/transactionRoutes.js
 import express from "express";
 import Transaction from "../models/Transaction.js";
-import mongoose from "mongoose";
-
 const router = express.Router();
 
 // Get all transactions for a user
 router.get("/", async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ message: "Unauthorized" });
-
-  const token = authHeader.split(" ")[1];
-  let userId;
-  try {
-    const decoded = require("jsonwebtoken").verify(token, process.env.JWT_SECRET);
-    userId = decoded.id;
-  } catch {
-    return res.status(401).json({ message: "Invalid token" });
-  }
+  const { userId } = req.query;
+  if (!userId) return res.status(400).json({ error: "Missing userId" });
 
   try {
     const transactions = await Transaction.find({ userId }).sort({ date: -1 });
     res.json(transactions);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Failed to fetch transactions" });
+    res.status(500).json({ error: "Failed to fetch transactions" });
   }
 });
 
-// Add transaction
+// Add a transaction
 router.post("/", async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ message: "Unauthorized" });
-  const token = authHeader.split(" ")[1];
-
-  let userId;
-  try {
-    const decoded = require("jsonwebtoken").verify(token, process.env.JWT_SECRET);
-    userId = decoded.id;
-  } catch {
-    return res.status(401).json({ message: "Invalid token" });
+  const { userId, type, category, amount, description } = req.body;
+  if (!userId || !type || !category || !amount) {
+    return res.status(400).json({ error: "Missing required fields" });
   }
-
-  const { type, category, amount, description, recurring } = req.body;
-  if (!type || !category || !amount) return res.status(400).json({ message: "Missing fields" });
 
   try {
     const transaction = new Transaction({
@@ -51,42 +29,29 @@ router.post("/", async (req, res) => {
       type,
       category,
       amount,
-      description: description || "",
-      recurring: recurring || false,
+      description,
     });
     await transaction.save();
-    const transactions = await Transaction.find({ userId }).sort({ date: -1 });
-    res.json(transactions);
+    res.json(transaction);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Failed to add transaction" });
+    res.status(500).json({ error: "Failed to add transaction" });
   }
 });
 
-// Delete transaction
+// Delete a transaction
 router.delete("/:id", async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ message: "Unauthorized" });
-  const token = authHeader.split(" ")[1];
-
-  let userId;
-  try {
-    const decoded = require("jsonwebtoken").verify(token, process.env.JWT_SECRET);
-    userId = decoded.id;
-  } catch {
-    return res.status(401).json({ message: "Invalid token" });
-  }
-
+  const { userId } = req.body;
   const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid ID" });
+
+  if (!userId) return res.status(400).json({ error: "Missing userId" });
 
   try {
     await Transaction.deleteOne({ _id: id, userId });
-    const transactions = await Transaction.find({ userId }).sort({ date: -1 });
-    res.json(transactions);
+    res.json({ success: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Failed to delete transaction" });
+    res.status(500).json({ error: "Failed to delete transaction" });
   }
 });
 
