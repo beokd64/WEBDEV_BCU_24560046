@@ -1,37 +1,29 @@
 // routes/assistantRoutes.js
 import express from "express";
-import fetch from "node-fetch";
 import Transaction from "../models/Transaction.js";
 import mongoose from "mongoose";
+import OpenAI from "openai";
 
 const router = express.Router();
+
+// Instantiate OpenAI client using env variable
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 router.post("/", async (req, res) => {
   const { message, userId } = req.body;
 
-  if (!message || !userId) {
+  if (!message || !userId)
     return res.status(400).json({ reply: "Message and userId are required" });
-  }
+
+  if (!mongoose.Types.ObjectId.isValid(userId))
+    return res.status(400).json({ reply: "Invalid userId" });
 
   try {
-    // Detect delete command
-    const deleteMatch = message.match(/delete transaction (\w+)/i);
-    if (deleteMatch) {
-      const txId = deleteMatch[1];
-      const deleted = await Transaction.findOneAndDelete({ _id: txId, userId });
-      const transactions = await Transaction.find({ userId }).sort({ date: -1 });
-
-      return res.json({
-        reply: deleted ? "Transaction deleted successfully." : "Transaction not found.",
-        transactions,
-      });
-    }
-
-    // AI Add transaction
+    // Construct prompt
     const prompt = `
-You are a finance transaction assistant. The user will give you a request like "add a 20 dollar coffee expense".
-IMPORTANT: Ignore any previous transactions, examples, or past messages. Only respond to this single request.
-You must output ONLY valid JSON in this exact format, nothing else:
+You are a finance transaction assistant.
+The user will give you a request like "add 20 for coffee".
+You MUST output ONLY valid JSON in this exact format:
 {
   "type": "income" or "expense",
   "category": "string",
@@ -39,76 +31,46 @@ You must output ONLY valid JSON in this exact format, nothing else:
   "description": "string",
   "recurring": true or false
 }
-Do NOT include userId or date — the system will handle it.
+Do NOT add any extra text.
 User message: ${message}
-    `;
+`;
 
-    const response = await fetch("http://localhost:11434/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "llama3",
-        prompt: prompt,
-        stream: false
-      }),
+    // Call OpenAI
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: "You are a finance transaction assistant." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0,
     });
 
-    const data = await response.json();
+    const text = completion.choices[0].message.content;
+    console.log("AI raw response:", text);
 
+    // Extract JSON safely
     let aiOutput;
     try {
-      aiOutput = JSON.parse(data.response);
-
-      // If AI returns an array
-      if (Array.isArray(aiOutput)) {
-        if (aiOutput.length !== 1) {
-          console.log("AI returned multiple objects:", aiOutput);
-          return res.status(400).json({ reply: "AI returned multiple transactions, ignoring." });
-        }
-        aiOutput = aiOutput[0];
-      }
-
-      // Ensure it's a single object
-      if (typeof aiOutput !== "object" || aiOutput === null) {
-        console.log("AI returned invalid output:", data.response);
-        return res.status(400).json({ reply: "AI did not return valid transaction JSON" });
-      }
-
-      console.log("AI Output to save:", aiOutput);
-
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error("AI did not return valid JSON");
+      aiOutput = JSON.parse(match[0]);
     } catch (err) {
-      console.error("AI JSON parse error:", err, "Response:", data.response);
-      return res.status(400).json({ reply: "AI did not return valid JSON" });
+      console.error("JSON parse error:", err);
+      return res.status(500).json({
+        reply: "AI did not return valid JSON. See server logs for details.",
+      });
     }
 
-    // Validate fields
-    const { type, category, amount, description, recurring } = aiOutput;
-    if (!["income", "expense"].includes(type) || !category || !amount) {
-      return res.status(400).json({ reply: "AI returned invalid transaction data" });
-    }
-
-    // Save transaction to DB
-    const newTransaction = new Transaction({
-      userId: new mongoose.Types.ObjectId(userId),
-      type,
-      category,
-      amount,
-      description: description || "",
-      recurring: recurring || false,
-    });
-
+    // Save transaction
+    const newTransaction = new Transaction({ userId, ...aiOutput });
     await newTransaction.save();
 
+    // Return updated transactions
     const transactions = await Transaction.find({ userId }).sort({ date: -1 });
-
-    res.json({
-      reply: "Transaction added successfully.",
-      transactions,
-    });
-
+    res.json({ reply: "Transaction added successfully.", transactions });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ reply: "Error processing request." });
+    console.error("AI processing error:", err);
+    res.status(500).json({ reply: "AI processing failed. See server logs." });
   }
 });
 

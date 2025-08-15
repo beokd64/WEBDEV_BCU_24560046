@@ -4,8 +4,8 @@ import cors from "cors";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import transactionRoutes from "./routes/transactionRoutes.js";
-import fetch from "node-fetch";
-import Transaction from "./models/Transaction.js"; // Make sure you have this model
+import Transaction from "./models/Transaction.js";
+import OpenAI from "openai";
 
 dotenv.config();
 connectDB();
@@ -13,6 +13,11 @@ connectDB();
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 const systemPrompt = `
 You are a financial transaction assistant.
@@ -30,52 +35,53 @@ app.use("/api/transactions", transactionRoutes);
 app.post("/api/assistant", async (req, res) => {
   const { message, userId } = req.body;
 
+  if (!message || !userId)
+    return res.status(400).json({ error: "Message and userId are required" });
+
   try {
-    // Send to Ollama
-    const ollamaRes = await fetch("http://localhost:11434/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "llama3",
-        prompt: `${systemPrompt}\nUser: ${message}`,
-        stream: false
-      }),
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: message }
+      ],
+      temperature: 0
     });
 
-    const ollamaData = await ollamaRes.json();
+    const aiText = completion.choices[0].message.content;
+    console.log("AI raw response:", aiText);
+
     let parsed;
     try {
-      parsed = JSON.parse(ollamaData.response.trim());
+      const match = aiText.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error("AI did not return valid JSON");
+      parsed = JSON.parse(match[0]);
     } catch {
-      return res.status(400).json({
-        error: "Invalid JSON from AI",
-        raw: ollamaData.response
-      });
+      return res.status(400).json({ error: "Invalid JSON from AI", raw: aiText });
     }
 
-    // Perform DB action
     let result;
     if (parsed.action === "add") {
       const newTransaction = new Transaction({
-        user: userId,
+        userId,
         description: parsed.description,
-        amount: parsed.amount
+        amount: parsed.amount,
+        type: parsed.type || "expense"
       });
       await newTransaction.save();
       result = { message: "Transaction added", transaction: newTransaction };
     } else if (parsed.action === "delete") {
-      await Transaction.deleteOne({ _id: parsed.id, user: userId });
+      await Transaction.deleteOne({ _id: parsed.id, userId });
       result = { message: "Transaction deleted", id: parsed.id };
     } else if (parsed.action === "clarify") {
       result = { message: parsed.message };
     }
 
-    // Return updated transactions
-    const transactions = await Transaction.find({ user: userId });
+    const transactions = await Transaction.find({ userId });
     res.json({ success: true, aiResult: parsed, transactions, result });
 
   } catch (err) {
-    console.error("Ollama AI error:", err);
+    console.error("OpenAI AI error:", err);
     res.status(500).json({ error: err.message });
   }
 });

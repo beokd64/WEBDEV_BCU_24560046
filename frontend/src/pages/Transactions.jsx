@@ -4,7 +4,7 @@ import api from "../api";
 import { formatCurrency } from "../utils/currency";
 
 export default function Transactions() {
-  const { token } = useContext(AuthContext);
+  const { token, user } = useContext(AuthContext);
   const [transactions, setTransactions] = useState([]);
   const [form, setForm] = useState({
     type: "expense",
@@ -12,9 +12,9 @@ export default function Transactions() {
     amount: "",
     description: "",
   });
-
   const [aiMessage, setAiMessage] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiReply, setAiReply] = useState("");
 
   const CURRENCY = "USD";
   const RATE = 1;
@@ -50,29 +50,24 @@ export default function Transactions() {
     fetchTransactions();
   };
 
-  // AI Assistant handler
   const handleAiCommand = async () => {
     if (!aiMessage.trim()) return;
+    if (!user?._id) return alert("User not found!");
+
     setAiLoading(true);
+    setAiReply("");
     try {
       const res = await api.post(
         "/api/assistant",
-        { message: aiMessage, userId: localStorage.getItem("userId") },
+        { message: aiMessage, userId: user._id },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      if (res.data.transactions) {
-        setTransactions(res.data.transactions);
-      }
-
-      if (res.data.reply) {
-        console.log("AI reply:", res.data.reply);
-      }
-
+      setAiReply(res.data.reply || "AI processed successfully");
+      fetchTransactions();
       setAiMessage("");
     } catch (err) {
       console.error("AI Error:", err);
-      alert("AI assistant failed to process your request.");
+      setAiReply("AI assistant failed to process your request.");
     }
     setAiLoading(false);
   };
@@ -82,12 +77,12 @@ export default function Transactions() {
       <h1 className="text-2xl font-semibold mb-4">Transactions</h1>
 
       {/* AI Assistant Command */}
-      <div className="mb-6 flex gap-2">
+      <div className="mb-2 flex gap-2">
         <input
           type="text"
           value={aiMessage}
           onChange={(e) => setAiMessage(e.target.value)}
-          placeholder='Ask AI: e.g. "Add 15 for coffee" or "Delete transaction 3"'
+          placeholder='Ask AI: e.g. "Add 15 for coffee"'
           className="border p-2 rounded flex-1"
         />
         <button
@@ -98,6 +93,7 @@ export default function Transactions() {
           {aiLoading ? "Processing..." : "Ask AI"}
         </button>
       </div>
+      {aiReply && <div className="mb-4 text-gray-700">{aiReply}</div>}
 
       {/* Manual Add Transaction Form */}
       <form onSubmit={addTransaction} className="mb-6 grid grid-cols-5 gap-2">
