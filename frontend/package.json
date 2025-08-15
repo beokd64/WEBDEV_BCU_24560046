@@ -16,13 +16,11 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.17.0",
-    "recharts": "^2.15.4"
-  },
-  "devDependencies": {
+    "recharts": "^2.15.4",
+    "vite": "^4.5.14",
     "@vitejs/plugin-react": "^4.0.4",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.41",
-    "tailwindcss": "^3.3.3",
-    "vite": "^4.5.14"
+    "tailwindcss": "^3.3.3"
   }
 }
