@@ -6,6 +6,7 @@ import authRoutes from "./routes/authRoutes.js";
 import transactionRoutes from "./routes/transactionRoutes.js";
 import Transaction from "./models/Transaction.js";
 import OpenAI from "openai";
+import apiDocsRoutes from "./routes/apiDocs.js";
 
 dotenv.config();
 connectDB();
@@ -31,6 +32,7 @@ Rules:
 
 app.use("/api/auth", authRoutes);
 app.use("/api/transactions", transactionRoutes);
+app.use("/api/docs", apiDocsRoutes);
 
 app.post("/api/assistant", async (req, res) => {
   const { message, userId } = req.body;
