@@ -12,13 +12,17 @@ dotenv.config();
 connectDB();
 
 const app = express();
-app.use(cors());
+
+// ✅ CORS config to allow your frontend domain
+app.use(cors({
+  origin: ["https://my-frontend-2xtv.onrender.com"],
+  credentials: true
+}));
+
 app.use(express.json());
 
 // Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const systemPrompt = `
 You are a financial transaction assistant.
@@ -26,14 +30,16 @@ You are a financial transaction assistant.
 Rules:
 - Only respond with valid JSON.
 - JSON format for adding: {"action": "add", "description": "string", "amount": number}
-- JSON format for deleting: {"action": "delete", "id": "mongodb_id"}
+- JSON format for deleting: {"action": "deleteByDescription", "description": "string"}
 - If unsure, ask the user for clarification in JSON: {"action": "clarify", "message": "string"}.
 `;
 
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/docs", apiDocsRoutes);
 
+// AI assistant endpoint
 app.post("/api/assistant", async (req, res) => {
   const { message, userId } = req.body;
 
@@ -72,14 +78,17 @@ app.post("/api/assistant", async (req, res) => {
       });
       await newTransaction.save();
       result = { message: "Transaction added", transaction: newTransaction };
-    } else if (parsed.action === "delete") {
-      await Transaction.deleteOne({ _id: parsed.id, userId });
-      result = { message: "Transaction deleted", id: parsed.id };
+    } else if (parsed.action === "deleteByDescription") {
+      const deleted = await Transaction.deleteMany({
+        description: { $regex: parsed.description, $options: "i" },
+        userId
+      });
+      result = { message: `Deleted ${deleted.deletedCount} transaction(s)` };
     } else if (parsed.action === "clarify") {
       result = { message: parsed.message };
     }
 
-    const transactions = await Transaction.find({ userId });
+    const transactions = await Transaction.find({ userId }).sort({ date: -1 });
     res.json({ success: true, aiResult: parsed, transactions, result });
 
   } catch (err) {
@@ -88,6 +97,7 @@ app.post("/api/assistant", async (req, res) => {
   }
 });
 
+// Root route
 app.get("/", (req, res) => res.send("API is running"));
 
 const PORT = process.env.PORT || 5000;
