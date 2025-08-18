@@ -1,120 +1,104 @@
 import { useState, useEffect, useContext } from "react";
-import { AuthContext } from "../context/AuthContext";
 import api from "../api";
-import { formatCurrency } from "../utils/currency";
+import { AuthContext } from "../context/AuthContext";
 
 export default function Transactions() {
-  const { user, token } = useContext(AuthContext);
+  const { token, user, logout } = useContext(AuthContext);
   const [transactions, setTransactions] = useState([]);
   const [form, setForm] = useState({ type: "expense", category: "", amount: "", description: "" });
-  const [aiMessage, setAiMessage] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const CURRENCY = "USD";
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiReply, setAiReply] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (token) fetchTransactions();
+  }, [token]);
 
   const fetchTransactions = async () => {
-    if (!user) return;
     try {
-      const res = await api.get(`/api/transactions?userId=${user._id}`, {
+      const res = await api.get("/transactions", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setTransactions(res.data || []);
-    } catch (err) { console.error(err); }
+    } catch {
+      setError("Failed to fetch transactions");
+    }
   };
-
-  useEffect(() => { fetchTransactions(); }, [user]);
 
   const addTransaction = async (e) => {
     e.preventDefault();
-    if (!form.amount || !form.category) return;
-    await api.post("/api/transactions", { ...form, amount: Number(form.amount), userId: user._id }, { headers: { Authorization: `Bearer ${token}` } });
-    setForm({ type: "expense", category: "", amount: "", description: "" });
-    fetchTransactions();
-  };
-
-  const deleteTransaction = async (id) => {
-    await api.delete(`/api/transactions/${id}`, { headers: { Authorization: `Bearer ${token}` }, data: { userId: user._id } });
-    fetchTransactions();
-  };
-
-  const handleAiCommand = async () => {
-    if (!aiMessage.trim()) return;
-    setAiLoading(true);
     try {
-      await api.post("/api/assistant", { message: aiMessage, userId: user._id }, { headers: { Authorization: `Bearer ${token}` } });
-      setAiMessage("");
+      await api.post("/transactions", form, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setForm({ type: "expense", category: "", amount: "", description: "" });
       fetchTransactions();
-    } catch (err) { console.error(err); }
-    setAiLoading(false);
+    } catch {
+      setError("Failed to add transaction");
+    }
+  };
+
+  const remove = async (id) => {
+    try {
+      await api.delete(`/transactions/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fetchTransactions();
+    } catch {
+      setError("Failed to delete transaction");
+    }
+  };
+
+  // 🔒 Calls your backend /api/ai; backend calls OpenAI with secret key
+  const askAI = async () => {
+    if (!aiPrompt.trim()) return;
+    try {
+      const res = await api.post("/ai", { prompt: aiPrompt });
+      setAiReply(res.data.reply || "");
+      setAiPrompt("");
+    } catch {
+      setAiReply("Error: could not reach AI.");
+    }
   };
 
   return (
-    <div className="p-10 max-w-6xl mx-auto font-sans text-gray-800">
-      <h1 className="text-3xl font-semibold mb-8">Transactions</h1>
-
-      {/* AI Assistant */}
-      <div className="flex gap-3 mb-6">
-        <input
-          type="text"
-          value={aiMessage}
-          onChange={(e) => setAiMessage(e.target.value)}
-          placeholder='Ask AI: "Add 15 for coffee"'
-          className="flex-1 px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-400 transition-all"
-        />
-        <button
-          onClick={handleAiCommand}
-          disabled={aiLoading}
-          className="bg-blue-600 text-white px-6 py-3 rounded-xl shadow-md hover:shadow-lg hover:bg-blue-700 transition-all"
-        >
-          {aiLoading ? "Processing..." : "Ask AI"}
-        </button>
+    <div className="p-6 max-w-3xl mx-auto">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold">Transactions</h2>
+        <button onClick={logout} className="text-sm underline">Logout</button>
       </div>
 
-      {/* Add Transaction */}
-      <form onSubmit={addTransaction} className="grid grid-cols-5 gap-4 mb-6">
-        <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="p-3 border rounded-xl focus:ring-2 focus:ring-blue-300 transition-all">
+      {error && <p className="text-red-600 mb-2">{error}</p>}
+
+      <form onSubmit={addTransaction} className="grid gap-2 grid-cols-5 mb-6">
+        <select name="type" value={form.type} onChange={(e) => setForm(f => ({ ...f, type: e.target.value }))} className="border p-2 rounded col-span-1">
           <option value="expense">Expense</option>
           <option value="income">Income</option>
         </select>
-        <input placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="p-3 border rounded-xl focus:ring-2 focus:ring-blue-300 transition-all" />
-        <input type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="p-3 border rounded-xl focus:ring-2 focus:ring-blue-300 transition-all" />
-        <input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="p-3 border rounded-xl focus:ring-2 focus:ring-blue-300 transition-all" />
-        <button className="bg-gray-900 text-white px-6 py-3 rounded-xl shadow-md hover:shadow-lg transition-all">Add</button>
+        <input name="category" value={form.category} onChange={(e) => setForm(f => ({ ...f, category: e.target.value }))} placeholder="Category" className="border p-2 rounded col-span-1" />
+        <input name="amount" type="number" value={form.amount} onChange={(e) => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="Amount" className="border p-2 rounded col-span-1" />
+        <input name="description" value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Description" className="border p-2 rounded col-span-1" />
+        <button className="bg-blue-600 text-white rounded px-4">Add</button>
       </form>
 
-      {/* Transactions Table */}
-      <div className="overflow-x-auto rounded-xl shadow-lg border border-gray-200">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-sm font-medium text-gray-500">Date</th>
-              <th className="px-6 py-3 text-sm font-medium text-gray-500">Type</th>
-              <th className="px-6 py-3 text-sm font-medium text-gray-500">Category</th>
-              <th className="px-6 py-3 text-sm font-medium text-gray-500">Amount</th>
-              <th className="px-6 py-3 text-sm font-medium text-gray-500">Description</th>
-              <th className="px-6 py-3 text-sm font-medium text-gray-500">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white">
-            {transactions.map((t) => (
-              <tr key={t._id} className="hover:bg-gray-50 transition-all">
-                <td className="px-6 py-4">{new Date(t.date).toLocaleDateString()}</td>
-                <td className="px-6 py-4">{t.type}</td>
-                <td className="px-6 py-4">{t.category}</td>
-                <td className="px-6 py-4">{formatCurrency(t.amount * 1, CURRENCY)}</td>
-                <td className="px-6 py-4">{t.description}</td>
-                <td className="px-6 py-4">
-                  <button onClick={() => deleteTransaction(t._id)} className="text-red-500 hover:text-red-700 transition-all">Delete</button>
-                </td>
-              </tr>
-            ))}
-            {transactions.length === 0 && (
-              <tr>
-                <td colSpan={6} className="text-center p-6 text-gray-400">No transactions found.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      <div className="mb-6">
+        <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder='Ask AI, e.g. "Summarize recent expenses"' className="border p-2 rounded w-full mb-2" />
+        <button onClick={askAI} className="bg-green-600 text-white rounded px-4 py-2">Ask AI</button>
+        {aiReply && <div className="mt-3 p-2 border rounded bg-gray-50 whitespace-pre-wrap">{aiReply}</div>}
       </div>
+
+      <ul className="space-y-2">
+        {transactions.map((t) => (
+          <li key={t._id} className="flex justify-between border p-2 rounded">
+            <div>
+              <div className="font-semibold">{t.type} • {t.category} • ${t.amount}</div>
+              <div className="text-sm text-gray-600">{t.description}</div>
+            </div>
+            <button onClick={() => remove(t._id)} className="text-red-600">Delete</button>
+          </li>
+        ))}
+        {!transactions.length && <li className="text-gray-500">No transactions yet.</li>}
+      </ul>
     </div>
   );
 }

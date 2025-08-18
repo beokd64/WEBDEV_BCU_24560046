@@ -1,24 +1,19 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Dashboard from "./pages/Dashboard";
-import Transactions from "./pages/Transactions";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
-import Settings from "./pages/Settings";
-import Navbar from "./components/Navbar";
-import Assistant from "./pages/Assistant"; // <-- new import
+import Transactions from "./pages/Transactions";
 
 export default function App() {
   return (
-    <Router>
-      <Navbar />
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/transactions" element={<Transactions />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/assistant" element={<Assistant />} /> {/* <-- new route */}
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/transactions" element={<Transactions />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

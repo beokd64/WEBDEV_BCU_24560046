@@ -1,7 +1,7 @@
 import axios from "axios";
 
-const API_URL = "https://my-backend-n3nx.onrender.com"; // your backend URL
-
-export default axios.create({
-  baseURL: API_URL,
+const api = axios.create({
+  baseURL: "https://my-backend-n3nx.onrender.com/api", // your deployed backend
 });
+
+export default api;
