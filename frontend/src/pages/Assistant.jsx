@@ -20,7 +20,7 @@ export default function Assistant() {
     setLoading(true);
 
     try {
-      const res = await axios.post("http://localhost:5000/api/assistant", {
+      const res = await axios.post("https://my-backend-n3nx.onrender.com/api/assistant", {
         message: userMessage.text,
       });
       const assistantMessage = { role: "assistant", text: res.data.reply };

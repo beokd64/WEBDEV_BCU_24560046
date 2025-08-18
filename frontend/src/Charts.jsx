@@ -5,7 +5,7 @@ export default function Charts() {
   const [transactions, setTransactions] = useState([]);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/transactions")
+    fetch("https://my-backend-n3nx.onrender.com/api/transactions")
       .then(res => res.json())
       .then(data => setTransactions(data));
   }, []);

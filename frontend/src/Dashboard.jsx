@@ -6,7 +6,7 @@ export default function Dashboard() {
   const [totalExpense, setTotalExpense] = useState(0);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/transactions") // Change if your backend URL differs
+    fetch("https://my-backend-n3nx.onrender.com/api/transactions") // Change if your backend URL differs
       .then(res => res.json())
       .then(data => {
         setTransactions(data);
